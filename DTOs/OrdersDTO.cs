@@ -1,12 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CRMapi.Models.Entity;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
-using System.Net;
 
-namespace CRMapi.Models.Entity
+namespace CRMapi.DTOs
 {
-    [Index(nameof(OrderNumber), Name = "OrderNumber_UQ", IsUnique = true)]
-    public class Orders : EntityBase
+    public class OrdersDTO
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
@@ -15,8 +13,7 @@ namespace CRMapi.Models.Entity
         public DateTime OrderDate { get; set; }
         [Required]
         public string CustomerDni { get; set; }
-        public Clients Client { get; set; }
-        public List <OrderDetails> OrderDetails { get; set; } = new List<OrderDetails>();
-
+        [Required]
+        public List<OrderDetails> OrderDetails { get; set; } = new List<OrderDetails>();
     }
 }

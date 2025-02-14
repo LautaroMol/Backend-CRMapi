@@ -4,6 +4,7 @@ using CRMapi.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CRMapi.Migrations
 {
     [DbContext(typeof(Context))]
-    partial class ContextModelSnapshot : ModelSnapshot
+    [Migration("20250213223945_images")]
+    partial class images
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,8 +24,6 @@ namespace CRMapi.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.HasSequence<int>("OrderNumbers", "shared");
 
             modelBuilder.Entity("CRMapi.Models.Entity.Clients", b =>
                 {
@@ -37,7 +38,7 @@ namespace CRMapi.Migrations
 
                     b.Property<string>("Dni")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -59,12 +60,6 @@ namespace CRMapi.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Dni")
-                        .IsUnique();
-
-                    b.HasIndex(new[] { "Dni" }, "Dni_UQ")
-                        .IsUnique();
 
                     b.ToTable("Customers");
                 });
@@ -126,19 +121,11 @@ namespace CRMapi.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("OrderNumber")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasDefaultValueSql("NEXT VALUE FOR shared.OrderNumbers");
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ClientId");
-
-                    b.HasIndex("OrderNumber")
-                        .IsUnique();
-
-                    b.HasIndex(new[] { "OrderNumber" }, "OrderNumber_UQ")
-                        .IsUnique();
 
                     b.ToTable("Orders");
                 });
@@ -156,7 +143,7 @@ namespace CRMapi.Migrations
 
                     b.Property<string>("Dni")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -176,12 +163,6 @@ namespace CRMapi.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Dni")
-                        .IsUnique();
-
-                    b.HasIndex(new[] { "Dni" }, "Dni_UQ")
-                        .IsUnique();
-
                     b.ToTable("Personals");
                 });
 
@@ -198,7 +179,7 @@ namespace CRMapi.Migrations
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -220,12 +201,6 @@ namespace CRMapi.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.HasIndex(new[] { "Code" }, "Code_UQ")
-                        .IsUnique();
-
                     b.ToTable("Products");
                 });
 
@@ -238,7 +213,7 @@ namespace CRMapi.Migrations
                         .IsRequired();
 
                     b.HasOne("CRMapi.Models.Entity.Product", "Product")
-                        .WithMany()
+                        .WithMany("OrderDetails")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -260,6 +235,11 @@ namespace CRMapi.Migrations
                 });
 
             modelBuilder.Entity("CRMapi.Models.Entity.Orders", b =>
+                {
+                    b.Navigation("OrderDetails");
+                });
+
+            modelBuilder.Entity("CRMapi.Models.Entity.Product", b =>
                 {
                     b.Navigation("OrderDetails");
                 });

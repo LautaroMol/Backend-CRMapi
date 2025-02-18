@@ -6,14 +6,13 @@ namespace CRMapi.DTOs
 {
     public class OrdersDTO
     {
-        [Key]
-        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
-        public int OrderNumber { get; set; }
         [Required]
         public DateTime OrderDate { get; set; }
         [Required]
-        public string CustomerDni { get; set; }
+        public string ClientDni { get; set; }
         [Required]
-        public List<OrderDetails> OrderDetails { get; set; } = new List<OrderDetails>();
+        public string Status { get; set; }
+        [Required]
+        public string PaymentMethod { get; set; }
     }
 }

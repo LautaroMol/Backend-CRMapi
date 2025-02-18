@@ -19,7 +19,6 @@ namespace CRMapi.Models.Entity
         [MaxLength(50, ErrorMessage = "El campo Email no puede tener mas de 50 caracteres")]
         public string Email { get; set; }
         [Required(ErrorMessage = "El campo Contraseña es requerido")]
-        [MaxLength(50, ErrorMessage = "El campo Contraseña no puede tener mas de 50 caracteres")]
         public string Password { get; set; }
     }
 }

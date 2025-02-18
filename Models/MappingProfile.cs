@@ -10,10 +10,12 @@ namespace CRMapi.Mappings
         {
             CreateMap<ProductDTO, Product>();
             CreateMap<ClientsDTO, Clients>();
-            CreateMap<OrdersDTO, Orders>();
             CreateMap<OrderDetailsDTO, OrderDetails>();
-            CreateMap<Product, ProductDTO>();
-            CreateMap<Clients, ClientsDTO>();
+            CreateMap<PersonalDTO, Personal>();
+            CreateMap<OrdersDTO, Orders>();
+            CreateMap<OrdersDTO, Orders>()
+            .ForMember(dest => dest.Client, opt => opt.Ignore());
+
         }
     }
 }

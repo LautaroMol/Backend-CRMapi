@@ -4,6 +4,7 @@ using CRMapi.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CRMapi.Migrations
 {
     [DbContext(typeof(Context))]
-    partial class ContextModelSnapshot : ModelSnapshot
+    [Migration("20250216021340_detalle")]
+    partial class detalle
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -60,7 +63,8 @@ namespace CRMapi.Migrations
 
                     b.Property<string>("password")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
 
@@ -113,9 +117,12 @@ namespace CRMapi.Migrations
                     b.Property<bool>("Activo")
                         .HasColumnType("bit");
 
-                    b.Property<string>("ClientDni")
+                    b.Property<int>("ClientId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CustomerDni")
                         .IsRequired()
-                        .HasColumnType("nvarchar(8)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("OrderDate")
                         .HasColumnType("datetime2");
@@ -135,7 +142,7 @@ namespace CRMapi.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClientDni");
+                    b.HasIndex("ClientId");
 
                     b.HasIndex("OrderNumber")
                         .IsUnique();
@@ -179,7 +186,8 @@ namespace CRMapi.Migrations
 
                     b.Property<string>("Password")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
 
@@ -262,8 +270,7 @@ namespace CRMapi.Migrations
                 {
                     b.HasOne("CRMapi.Models.Entity.Clients", "Client")
                         .WithMany()
-                        .HasForeignKey("ClientDni")
-                        .HasPrincipalKey("Dni")
+                        .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

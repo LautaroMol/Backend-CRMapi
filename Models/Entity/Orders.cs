@@ -14,8 +14,13 @@ namespace CRMapi.Models.Entity
         [Required]
         public DateTime OrderDate { get; set; }
         [Required]
-        public string CustomerDni { get; set; }
+        public string ClientDni { get; set; }
+        [ForeignKey("ClientDni")]
         public Clients Client { get; set; }
+        [Required]
+        public string Status { get; set; }
+        [Required]
+        public string PaymentMethod { get; set; }
         public List <OrderDetails> OrderDetails { get; set; } = new List<OrderDetails>();
 
     }

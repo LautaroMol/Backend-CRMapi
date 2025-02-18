@@ -7,11 +7,10 @@ namespace CRMapi.Models
     public class Context : DbContext
     {
         public Context(DbContextOptions<Context> options) : base(options) { }
-
         public DbSet<Entity.Product> Products { get; set; }
         public DbSet<Entity.Orders> Orders { get; set; }
         public DbSet<Entity.OrderDetails> OrderDetails { get; set; }
-        public DbSet<Entity.Clients> Customers { get; set; }
+        public DbSet<Entity.Clients> Clients { get; set; }
         public DbSet<Entity.Personal> Personals { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -42,6 +41,12 @@ namespace CRMapi.Models
             modelBuilder.Entity<OrderDetails>()
                 .Property(od => od.OrderNumber)
                 .ValueGeneratedNever();
+
+            modelBuilder.Entity<Orders>()
+            .HasOne(o => o.Client)
+            .WithMany()
+            .HasForeignKey(o => o.ClientDni)
+            .HasPrincipalKey(c => c.Dni);
 
             modelBuilder.Entity<OrderDetails>()
                 .HasOne(od => od.Order)

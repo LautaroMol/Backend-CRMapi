@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using CRMapi.DTOs;
+using CRMapi.Migrations;
 using CRMapi.Models;
 using CRMapi.Models.Entity;
 using Microsoft.AspNetCore.Mvc;
@@ -26,10 +27,10 @@ namespace CRMapi.Controllers
             return await _context.Products.ToListAsync();
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Product>> GetProduct(int id)
+        [HttpGet("{code}")]
+        public async Task<ActionResult<Product>> GetProduct(string code)
         {
-            var product = await _context.Products.FindAsync(id);
+            var product = await _context.Products.FirstOrDefaultAsync(p => p.Code == code);
 
             if (product == null)
             {
@@ -43,6 +44,10 @@ namespace CRMapi.Controllers
         public async Task<ActionResult<Product>> PostProduct([FromForm] ProductDTO productDto)
         {
             var product = _mapper.Map<Product>(productDto);
+            if (await _context.Products.AnyAsync(p => p.Code == productDto.Code))
+            {
+                return BadRequest("El código ya está registrado.");
+            }
 
             // Crear la carpeta 'uploads' si no existe
             var uploadsFolderPath = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
@@ -69,19 +74,24 @@ namespace CRMapi.Controllers
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
+            return CreatedAtAction(nameof(GetProduct), new { code = product.Code }, product);
         }
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutProduct(int id, [FromForm] ProductDTO productDto)
+        [HttpPut("{code}")]
+        public async Task<IActionResult> PutProduct(string code, [FromForm] ProductDTO productDto)
         {
-            var product = await _context.Products.FindAsync(id);
+
+            var product = await _context.Products.FirstOrDefaultAsync(p => p.Code == code);
 
             if (product == null)
             {
                 return NotFound();
             }
 
+            if (productDto.Code != product.Code && await _context.Products.AnyAsync(p => p.Code == productDto.Code))
+            {
+                return BadRequest("El código ya está registrado.");
+            }
             _mapper.Map(productDto, product);
 
             // Crear la carpeta 'uploads' si no existe

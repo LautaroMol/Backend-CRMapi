@@ -365,6 +365,10 @@ app.MapDelete("/orderDetails/{id}", async (int id, Context db) =>
 app.MapPost("/personal", async(PersonalDTO personalDTO, Context db, IMapper mapper
     ,IMessage messageService)=>
 {
+    if (await db.Personals.AnyAsync(c => c.Email == personalDTO.Email))
+    {
+        return Results.BadRequest("El email ya está registrado.");
+    }
     var Personal = mapper.Map<Personal>(personalDTO);
     Personal.Password = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
     db.Personals.Add(Personal);
@@ -388,6 +392,10 @@ app.MapGet("/personal/{dni:int}", async (string dni, Context db) =>
 
 app.MapPut("/personal/{dni:int}", async (int id,PersonalDTO personalDTO,Context db) =>
 {
+    if (await db.Personals.AnyAsync(c => c.Email == personalDTO.Email && c.Dni != personalDTO.Dni))
+    {
+        return Results.BadRequest("El email ya está registrado.");
+    }
     var Personal = await db.Personals.FindAsync(id);
     if (Personal is null) return Results.NotFound();
     Personal.Name = personalDTO.Name;
@@ -413,10 +421,8 @@ app.MapDelete("/personal/{dni:int}", async (int dni, Context db) =>
 
 });
 
-
-
-
 #endregion
+
 
 app.MapControllers();
 

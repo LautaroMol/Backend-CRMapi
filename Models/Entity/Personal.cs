@@ -1,10 +1,12 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace CRMapi.Models.Entity
 {
     [Index(nameof(Dni), Name = "Dni_UQ", IsUnique = true)]
-    public class Personal : EntityBase
+    public class Personal : IdentityUser
     {
         [Required(ErrorMessage = "El campo Nombre es requerido")]
         [MaxLength(50, ErrorMessage = "El campo Nombre no puede tener mas de 50 caracteres")]
@@ -15,10 +17,6 @@ namespace CRMapi.Models.Entity
         [Required(ErrorMessage = "El campo DNI es requerido")]
         [MaxLength(50, ErrorMessage = "El campo DNI no puede tener mas de 50 caracteres")]
         public string Dni { get; set; }
-        [Required(ErrorMessage = "El campo Email es requerido")]
-        [MaxLength(50, ErrorMessage = "El campo Email no puede tener mas de 50 caracteres")]
-        public string Email { get; set; }
-        [Required(ErrorMessage = "El campo Contraseña es requerido")]
-        public string Password { get; set; }
+        
     }
 }

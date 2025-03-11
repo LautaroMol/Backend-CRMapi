@@ -1,17 +1,20 @@
 ﻿using CRMapi.Models.Entity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System;
 
 namespace CRMapi.Models
 {
-    public class Context : DbContext
+    public class Context : IdentityDbContext<Personal, IdentityRole, string>
     {
-        public Context(DbContextOptions<Context> options) : base(options) { }
-        public DbSet<Entity.Product> Products { get; set; }
-        public DbSet<Entity.Orders> Orders { get; set; }
-        public DbSet<Entity.OrderDetails> OrderDetails { get; set; }
-        public DbSet<Entity.Clients> Clients { get; set; }
-        public DbSet<Entity.Personal> Personals { get; set; }
+        public Context(DbContextOptions<Context> options)
+        : base(options) { }
+        public DbSet<Product> Products { get; set; }
+        public DbSet<Orders> Orders { get; set; }
+        public DbSet<OrderDetails> OrderDetails { get; set; }
+        public DbSet<Clients> Clients { get; set; }
+        public DbSet<Personal> Personals { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

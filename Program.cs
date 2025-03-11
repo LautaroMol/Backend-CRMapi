@@ -6,14 +6,68 @@ using CRMapi.Models.Entity;
 using CRMapi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using TuProyecto;
+
 
 var builder = WebApplication.CreateBuilder(args);
+
+async Task InitializeDatabaseAsync(IServiceProvider serviceProvider)
+{
+    Console.WriteLine("Ejecutando SeedData...");  // 👈 Agregado para verificar ejecución
+
+    using var scope = serviceProvider.CreateScope();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+    var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    // Crear roles si no existen
+    string[] roles = { "Admin", "User" };
+    foreach (var role in roles)
+    {
+        if (!await roleManager.RoleExistsAsync(role))
+        {
+            await roleManager.CreateAsync(new IdentityRole(role));
+            Console.WriteLine($"Rol {role} creado.");
+        }
+    }
+
+    // Crear usuario Admin si no existe
+    string adminEmail = "admin@example.com";
+    string adminPassword = "Admin123!";
+    if (await userManager.FindByEmailAsync(adminEmail) == null)
+    {
+        if (!await roleManager.RoleExistsAsync("Admin"))
+        {
+            await roleManager.CreateAsync(new IdentityRole { Name = "Admin" });
+        }
+        var adminUser = new IdentityUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
+        var result = await userManager.CreateAsync(adminUser, adminPassword);
+
+        if (result.Succeeded)
+        {
+            await userManager.AddToRoleAsync(adminUser, "Admin");
+            Console.WriteLine("Usuario Admin creado.");
+        }
+        else
+        {
+            Console.WriteLine("Error al crear usuario Admin:");
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine(error.Description);
+            }
+        }
+    }
+}
+
+
 
 //Configuraciones Entity Framework
 builder.Services.AddDbContext<Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("Connection")));
@@ -21,15 +75,23 @@ builder.Services.AddDbContext<Context>(options => options.UseSqlServer(builder.C
 //configuracion AutoMapper
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 
+
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddControllersWithViews();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.Configure<GmailSettings>(builder.Configuration.GetSection("GmailSettings"));
 builder.Services.AddTransient<IMessage, Message>();
 
+builder.Services.AddIdentity<Personal, IdentityRole>()
+    .AddEntityFrameworkStores<Context>()
+    .AddDefaultTokenProviders();
+
+
 var key = Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:SecretKey"]);
+
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -60,6 +122,13 @@ app.UseAuthentication(); // Asegúrate de que la autenticación esté configurad
 app.UseAuthorization();
 
 app.MapControllers();
+//seed database
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    await SeedData.InitializeAsync(services);
+}
+
 
 #region orders
 //API routes
@@ -370,7 +439,7 @@ app.MapPost("/personal", async(PersonalDTO personalDTO, Context db, IMapper mapp
         return Results.BadRequest("El email ya está registrado.");
     }
     var Personal = mapper.Map<Personal>(personalDTO);
-    Personal.Password = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
+    Personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
     db.Personals.Add(Personal);
     await db.SaveChangesAsync();
 
@@ -402,7 +471,7 @@ app.MapPut("/personal/{dni:int}", async (int id,PersonalDTO personalDTO,Context 
     Personal.LastName = personalDTO.LastName;
     Personal.Dni = personalDTO.Dni;
     Personal.Email = personalDTO.Email;
-    Personal.Password = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
+    Personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
     await db.SaveChangesAsync();
 
     return Results.Ok();

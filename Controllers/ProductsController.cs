@@ -1,6 +1,5 @@
 ﻿using AutoMapper;
 using CRMapi.DTOs;
-using CRMapi.Migrations;
 using CRMapi.Models;
 using CRMapi.Models.Entity;
 using Microsoft.AspNetCore.Mvc;

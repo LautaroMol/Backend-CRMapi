@@ -21,54 +21,15 @@ using TuProyecto;
 
 var builder = WebApplication.CreateBuilder(args);
 
-async Task InitializeDatabaseAsync(IServiceProvider serviceProvider)
+
+
+//IdentityAPp
+builder.Services.AddDefaultIdentity<Personal>(options =>
 {
-    Console.WriteLine("Ejecutando SeedData...");  // 👈 Agregado para verificar ejecución
-
-    using var scope = serviceProvider.CreateScope();
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
-    var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    // Crear roles si no existen
-    string[] roles = { "Admin", "User" };
-    foreach (var role in roles)
-    {
-        if (!await roleManager.RoleExistsAsync(role))
-        {
-            await roleManager.CreateAsync(new IdentityRole(role));
-            Console.WriteLine($"Rol {role} creado.");
-        }
-    }
-
-    // Crear usuario Admin si no existe
-    string adminEmail = "admin@example.com";
-    string adminPassword = "Admin123!";
-    if (await userManager.FindByEmailAsync(adminEmail) == null)
-    {
-        if (!await roleManager.RoleExistsAsync("Admin"))
-        {
-            await roleManager.CreateAsync(new IdentityRole { Name = "Admin" });
-        }
-        var adminUser = new IdentityUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
-        var result = await userManager.CreateAsync(adminUser, adminPassword);
-
-        if (result.Succeeded)
-        {
-            await userManager.AddToRoleAsync(adminUser, "Admin");
-            Console.WriteLine("Usuario Admin creado.");
-        }
-        else
-        {
-            Console.WriteLine("Error al crear usuario Admin:");
-            foreach (var error in result.Errors)
-            {
-                Console.WriteLine(error.Description);
-            }
-        }
-    }
-}
-
-
-
+    options.SignIn.RequireConfirmedAccount = false;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<Context>();
 //Configuraciones Entity Framework
 builder.Services.AddDbContext<Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("Connection")));
 
@@ -84,15 +45,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.Configure<GmailSettings>(builder.Configuration.GetSection("GmailSettings"));
 builder.Services.AddTransient<IMessage, Message>();
+builder.Services.AddRazorPages();
 
-builder.Services.AddIdentity<Personal, IdentityRole>()
-    .AddEntityFrameworkStores<Context>()
-    .AddDefaultTokenProviders();
-
-
+//key y swt
 var key = Encoding.UTF8.GetBytes(builder.Configuration["JwtSettings:SecretKey"]);
-
-
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -106,6 +62,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = false
         };
     });
+
+
 
 var app = builder.Build();
 
@@ -431,20 +389,22 @@ app.MapDelete("/orderDetails/{id}", async (int id, Context db) =>
 
 #region Personal
 
-app.MapPost("/personal", async(PersonalDTO personalDTO, Context db, IMapper mapper
-    ,IMessage messageService)=>
+app.MapPost("/personal", async (PersonalDTO personalDTO, Context db, IMapper mapper, IMessage messageService) =>
 {
-    if (await db.Personals.AnyAsync(c => c.Email == personalDTO.Email))
+    if (await db.Personals.AnyAsync(c => c.NormalizedEmail == personalDTO.Email.ToUpper()))
     {
         return Results.BadRequest("El email ya está registrado.");
     }
-    var Personal = mapper.Map<Personal>(personalDTO);
-    Personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
-    db.Personals.Add(Personal);
+
+    var personal = mapper.Map<Personal>(personalDTO);
+    personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
+    personal.NormalizedEmail = personalDTO.Email.ToUpper();
+
+    db.Personals.Add(personal);
     await db.SaveChangesAsync();
 
     var subject = "Confirmación de registro";
-    var body = $"Hola {personalDTO.Name},\n\n Su usuario ha sido dado de alta en el sistema.";
+    var body = $"Hola {personalDTO.Name},\n\nSu usuario ha sido dado de alta en el sistema.";
     messageService.SendEmail(subject, body, personalDTO.Email);
 
     return Results.Ok();
@@ -459,23 +419,26 @@ app.MapGet("/personal/{dni:int}", async (string dni, Context db) =>
     return personal is not null ? Results.Ok(personal) : Results.NotFound();
 });
 
-app.MapPut("/personal/{dni:int}", async (int id,PersonalDTO personalDTO,Context db) =>
+app.MapPut("/personal/{id:int}", async (string id, PersonalDTO personalDTO, Context db) =>
 {
-    if (await db.Personals.AnyAsync(c => c.Email == personalDTO.Email && c.Dni != personalDTO.Dni))
+    if (await db.Personals.AnyAsync(c => c.NormalizedEmail == personalDTO.Email.ToUpper() && c.Id != id))
     {
         return Results.BadRequest("El email ya está registrado.");
     }
-    var Personal = await db.Personals.FindAsync(id);
-    if (Personal is null) return Results.NotFound();
-    Personal.Name = personalDTO.Name;
-    Personal.LastName = personalDTO.LastName;
-    Personal.Dni = personalDTO.Dni;
-    Personal.Email = personalDTO.Email;
-    Personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
+
+    var personal = await db.Personals.FindAsync(id);
+    if (personal is null) return Results.NotFound();
+
+    personal.Name = personalDTO.Name;
+    personal.LastName = personalDTO.LastName;
+    personal.Dni = personalDTO.Dni;
+    personal.Email = personalDTO.Email;
+    personal.NormalizedEmail = personalDTO.Email.ToUpper();
+    personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
+
     await db.SaveChangesAsync();
 
     return Results.Ok();
-
 });
 
 app.MapDelete("/personal/{dni:int}", async (int dni, Context db) =>
@@ -493,6 +456,7 @@ app.MapDelete("/personal/{dni:int}", async (int dni, Context db) =>
 #endregion
 
 
+app.MapRazorPages();
 app.MapControllers();
 
 app.UseStaticFiles();

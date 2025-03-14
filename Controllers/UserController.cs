@@ -1,147 +1,199 @@
 ﻿using CRMapi.DTOs;
-using CRMapi.Models;
+using CRMapi.Models.Entity;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.IdentityModel.Tokens;
-using AutoMapper;
-using CRMapi.Models.Entity;
-using Microsoft.AspNetCore.Identity.Data;
-using System.Data;
+using System.Threading.Tasks;
 
-[Route("api/[controller]")]
+[Route("api/personal")]
 [ApiController]
 public class PersonalController : ControllerBase
 {
-    private readonly Context _context;
-    private readonly IMapper _mapper;
-    private readonly IConfiguration _configuration;
     private readonly UserManager<Personal> _userManager;
+    private readonly RoleManager<IdentityRole> _roleManager;
+    private readonly IConfiguration _configuration;
 
-    public PersonalController(Context context, IMapper mapper, IConfiguration configuration, UserManager<Personal> userManager)
+    public PersonalController(UserManager<Personal> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration)
     {
-        _context = context;
-        _mapper = mapper;
-        _configuration = configuration;
         _userManager = userManager;
+        _roleManager = roleManager;
+        _configuration = configuration;
     }
 
-    /// Register
+    // User Registry
     [HttpPost("register")]
-    public async Task<IActionResult> Register(PersonalDTO personalDTO)
+    public async Task<IActionResult> Register([FromBody] PersonalDTO model)
     {
-        if (await _context.Personals.AnyAsync(p => p.NormalizedEmail == personalDTO.Email.ToUpper()))
+        var existingUser = await _userManager.FindByEmailAsync(model.Email.ToUpper());
+        if (existingUser != null)
         {
             return BadRequest("El email ya está registrado.");
         }
 
-        var personal = _mapper.Map<Personal>(personalDTO);
-        personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
-        personal.NormalizedEmail = personalDTO.Email.ToUpper(); // Normalizar email
+        var user = new Personal
+        {
+            Name = model.Name,
+            LastName = model.LastName,
+            Dni = model.Dni,
+            UserName = model.Name.ToUpper(),
+            Email = model.Email.ToUpper(),
+        };
 
-        _context.Personals.Add(personal);
-        await _context.SaveChangesAsync();
+        var result = await _userManager.CreateAsync(user, model.Password);
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors);
+        }
 
-        return Ok("Usuario registrado correctamente.");
+        // Si el email es del dueño, asignarle "Administrator", sino "User" por defecto
+        string role = model.Email == "laumol158@gmail.com" ? "Administrator" : "User";
+        await _userManager.AddToRoleAsync(user, role);
+
+        return Ok(new { message = "Usuario registrado exitosamente", role });
     }
 
-    /// Login return a JWT
 
+    // Login
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest model)
     {
         var user = await _userManager.FindByEmailAsync(model.Email);
-        if (user == null || !BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash))
+        if (user == null || !await _userManager.CheckPasswordAsync(user, model.Password))
         {
             return Unauthorized("Credenciales incorrectas.");
         }
 
-        // Obtener roles del usuario
         var roles = await _userManager.GetRolesAsync(user);
-        string userRole = roles.FirstOrDefault() ?? "SinRol"; // Si no tiene rol, devuelve "SinRol"
+        var token = GenerateJwtToken(user, roles);
 
-        // Generar token JWT
-        var token = GenerateJwtToken(user, userRole);
-
-        return Ok(new { Token = token, Role = userRole });
-    }
-
-    /// Users
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<Personal>>> GetAll()
-    {
-        return await _context.Personals.ToListAsync();
-    }
-
-    /// <summary>
-    /// users by dni
-    /// </summary>
-    [HttpGet("{dni}")]
-    public async Task<ActionResult<Personal>> GetByDni(string dni)
-    {
-        var personal = await _context.Personals.FirstOrDefaultAsync(p => p.Dni == dni);
-        if (personal == null) return NotFound("Usuario no encontrado.");
-        return Ok(personal);
-    }
-
-    /// update
-    [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(string id, PersonalDTO personalDTO)
-    {
-        var personal = await _context.Personals.FindAsync(id);
-        if (personal == null) return NotFound("Usuario no encontrado.");
-
-        if (await _context.Personals.AnyAsync(p => p.NormalizedEmail == personalDTO.Email.ToUpper() && p.Id != id))
+        return Ok(new
         {
-            return BadRequest("El email ya está registrado por otro usuario.");
-        }
-
-        personal.Name = personalDTO.Name;
-        personal.LastName = personalDTO.LastName;
-        personal.Dni = personalDTO.Dni;
-        personal.Email = personalDTO.Email;
-        personal.NormalizedEmail = personalDTO.Email.ToUpper();
-        personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
-
-        await _context.SaveChangesAsync();
-        return Ok("Usuario actualizado correctamente.");
+            Token = token,
+            User = new
+            {
+                user.Id,
+                user.UserName,
+                user.Email,
+                Roles = roles
+            }
+        });
     }
 
-    /// Delete users by id
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id)
+    // GetALl Users
+    [HttpGet("usuarios")]
+    [Authorize(Roles = "Administrator,Manager")]
+    public async Task<IActionResult> GetAllUsers()
     {
-        var personal = await _context.Personals.FindAsync(id);
-        if (personal == null) return NotFound("Usuario no encontrado.");
-
-        _context.Personals.Remove(personal);
-        await _context.SaveChangesAsync();
-        return Ok("Usuario eliminado correctamente.");
+        var users = await _userManager.Users.ToListAsync();
+        return Ok(users);
     }
 
-    /// JWT generation
-    private string GenerateJwtToken(Personal user, string role)
+    // Get users By DNI
+    [HttpGet("{dni}")]
+    public async Task<IActionResult> GetUserByDni(string dni)
     {
+        var user = await _userManager.Users.FirstOrDefaultAsync(u => u.Dni == dni);
+        if (user == null)
+            return NotFound("Usuario no encontrado.");
+
+        return Ok(user);
+    }
+
+    // Update Users
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateUser(string id, [FromBody] PersonalDTO model)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+            return NotFound("Usuario no encontrado.");
+
+        user.Name = model.Name;
+        user.LastName = model.LastName;
+        user.Dni = model.Dni;
+        user.Email = model.Email.ToUpper();
+        user.UserName = model.Name.ToUpper();
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            return BadRequest(result.Errors);
+
+        return Ok(new { message = "Usuario actualizado exitosamente" });
+    }
+
+
+    //rol update
+    [HttpPut("rol-update/{id}")]
+    [Authorize(Roles = "Administrator")] 
+    public async Task<IActionResult> ChangeUserRole(string id, [FromBody] string newRole)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+            return NotFound("Usuario no encontrado.");
+
+        var currentRoles = await _userManager.GetRolesAsync(user);
+
+        if (!await _roleManager.RoleExistsAsync(newRole))
+            return BadRequest("El rol especificado no existe.");
+
+        await _userManager.RemoveFromRolesAsync(user, currentRoles);
+
+        var result = await _userManager.AddToRoleAsync(user, newRole);
+        if (!result.Succeeded)
+            return BadRequest(result.Errors);
+
+        return Ok(new { message = $"El usuario ahora tiene el rol {newRole}" });
+    }
+
+
+    // Delete Users
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteUser(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+            return NotFound("Usuario no encontrado.");
+
+        var result = await _userManager.DeleteAsync(user);
+        if (!result.Succeeded)
+            return BadRequest(result.Errors);
+
+        return Ok(new { message = "Usuario eliminado exitosamente" });
+    }
+
+    // Generate JWT Token
+    private string GenerateJwtToken(Personal user, IList<string> roles)
+    {
+        var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.UTF8.GetBytes(_configuration["JwtSettings:SecretKey"]);
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, role)
+            new Claim(ClaimTypes.Name, user.UserName)
         };
 
-        var token = new JwtSecurityToken(
-            issuer: _configuration["JwtSettings:Issuer"],
-            audience: _configuration["JwtSettings:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(3),
-            signingCredentials: new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256)
-        );
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        var tokenDescriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = DateTime.UtcNow.AddHours(2),
+            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
+            Issuer = _configuration["JwtSettings:Issuer"],
+            Audience = _configuration["JwtSettings:Audience"]
+        };
+
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
     }
 }

@@ -23,11 +23,17 @@ namespace TuProyecto
 
         private static async Task EnsureRolesAsync(RoleManager<IdentityRole> roleManager)
         {
-            var alreadyExists = await roleManager.RoleExistsAsync(Constants.AdministratorRole);
-            if (alreadyExists) return;
+            string[] roleNames = { "Administrator", "Manager", "User" };
 
-            await roleManager.CreateAsync(new IdentityRole(Constants.AdministratorRole));
+            foreach (var role in roleNames)
+            {
+                if (!await roleManager.RoleExistsAsync(role))
+                {
+                    await roleManager.CreateAsync(new IdentityRole(role));
+                }
+            }
         }
+
 
         private static async Task EnsureTestAdminAsync(UserManager<Personal> userManager)
         {

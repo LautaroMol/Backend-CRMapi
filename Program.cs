@@ -24,11 +24,29 @@ var builder = WebApplication.CreateBuilder(args);
 
 
 //IdentityAPp
-builder.Services.AddDefaultIdentity<Personal>(options =>
+builder.Services.AddIdentity<Personal,IdentityRole>(options =>
 {
+    //password options
+    options.Password.RequireDigit = true;         
+    options.Password.RequireLowercase = false;     
+    options.Password.RequireUppercase = false; 
+    options.Password.RequireNonAlphanumeric = true; 
+    options.Password.RequiredLength = 6; 
+    
+    options.Password.RequiredUniqueChars = 1;
+
     options.SignIn.RequireConfirmedAccount = false;
+
+    //confirmed Email
+    options.SignIn.RequireConfirmedEmail = false;
+
+    //lockout
+    options.Lockout.AllowedForNewUsers = true;
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
 })
 .AddRoles<IdentityRole>()
+.AddDefaultTokenProviders()
 .AddEntityFrameworkStores<Context>();
 //Configuraciones Entity Framework
 builder.Services.AddDbContext<Context>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("Connection")));
@@ -387,73 +405,7 @@ app.MapDelete("/orderDetails/{id}", async (int id, Context db) =>
 
 #endregion
 
-#region Personal
 
-app.MapPost("/personal", async (PersonalDTO personalDTO, Context db, IMapper mapper, IMessage messageService) =>
-{
-    if (await db.Personals.AnyAsync(c => c.NormalizedEmail == personalDTO.Email.ToUpper()))
-    {
-        return Results.BadRequest("El email ya está registrado.");
-    }
-
-    var personal = mapper.Map<Personal>(personalDTO);
-    personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
-    personal.NormalizedEmail = personalDTO.Email.ToUpper();
-
-    db.Personals.Add(personal);
-    await db.SaveChangesAsync();
-
-    var subject = "Confirmación de registro";
-    var body = $"Hola {personalDTO.Name},\n\nSu usuario ha sido dado de alta en el sistema.";
-    messageService.SendEmail(subject, body, personalDTO.Email);
-
-    return Results.Ok();
-});
-
-app.MapGet("/personal", async (Context db) =>
-    await db.Personals.ToListAsync());
-
-app.MapGet("/personal/{dni:int}", async (string dni, Context db) =>
-{
-    Personal personal = await db.Personals.FirstOrDefaultAsync(p => p.Dni == dni);
-    return personal is not null ? Results.Ok(personal) : Results.NotFound();
-});
-
-app.MapPut("/personal/{id:int}", async (string id, PersonalDTO personalDTO, Context db) =>
-{
-    if (await db.Personals.AnyAsync(c => c.NormalizedEmail == personalDTO.Email.ToUpper() && c.Id != id))
-    {
-        return Results.BadRequest("El email ya está registrado.");
-    }
-
-    var personal = await db.Personals.FindAsync(id);
-    if (personal is null) return Results.NotFound();
-
-    personal.Name = personalDTO.Name;
-    personal.LastName = personalDTO.LastName;
-    personal.Dni = personalDTO.Dni;
-    personal.Email = personalDTO.Email;
-    personal.NormalizedEmail = personalDTO.Email.ToUpper();
-    personal.PasswordHash = BCrypt.Net.BCrypt.HashPassword(personalDTO.Password);
-
-    await db.SaveChangesAsync();
-
-    return Results.Ok();
-});
-
-app.MapDelete("/personal/{dni:int}", async (int dni, Context db) =>
-{
-    var Personal = await db.Personals.FindAsync(dni);
-    if (Personal is null) return Results.NotFound();
-
-    db.Personals.Remove(Personal);
-    await db.SaveChangesAsync();
-
-    return Results.Ok();
-
-});
-
-#endregion
 
 
 app.MapRazorPages();
